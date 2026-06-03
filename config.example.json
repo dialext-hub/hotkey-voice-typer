@@ -1,0 +1,8 @@
+{
+  "groq_api_key": "gsk_your_key_here",
+  "proxy": "",
+  "voice_replacements": [
+    {"from": "Cloud Code", "to": "Claude Code"},
+    {"from": "Codorg[ao]s", "to": "CodOrgOS", "regex": true}
+  ]
+}

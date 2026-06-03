@@ -1,0 +1,21 @@
+# Config with API key
+config.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Audio temp files
+*.wav
+*.mp3
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
