@@ -8,11 +8,11 @@ Voice Typer — держи клавишу, говори, отпускай → т
     python voice_typer.py --key f8     # другая клавиша
     python voice_typer.py --type       # автопечатать вместо буфера обмена
     python voice_typer.py --lang en    # английский
+    python voice_typer.py --notify     # toast-уведомления с расшифровкой
 
+Настройки берутся из config.json (groq_api_key, proxy).
 Зависимости:
-    pip install sounddevice numpy keyboard pyperclip requests scipy
-
-Настройки берутся из transcribe/config.json (groq_api_key, proxy).
+    pip install sounddevice numpy keyboard pyperclip requests scipy pystray Pillow plyer
 """
 
 import os
@@ -32,9 +32,11 @@ try:
     import keyboard
     import pyperclip
     import requests
+    import pystray
+    from PIL import Image, ImageDraw
 except ImportError as e:
     print(f"Не хватает зависимостей: {e}")
-    print("Установи: pip install sounddevice numpy keyboard pyperclip requests scipy")
+    print("Установи: pip install sounddevice numpy keyboard pyperclip requests scipy pystray Pillow plyer")
     sys.exit(1)
 
 # --- Конфиг ---
@@ -46,6 +48,32 @@ def load_config():
         with open(CONFIG_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
     return {}
+
+# --- Системный трей ---
+
+ICON_COLORS = {
+    "idle":       (136, 136, 136),
+    "recording":  (229,  57,  53),
+    "processing": (249, 168,  37),
+    "error":      (229,  57,  53),
+}
+
+def hide_console():
+    try:
+        import ctypes
+        hwnd = ctypes.windll.kernel32.GetConsoleWindow()
+        if hwnd:
+            ctypes.windll.user32.ShowWindow(hwnd, 0)
+    except Exception:
+        pass
+
+def make_icon(state, size=64):
+    color = ICON_COLORS.get(state, ICON_COLORS["idle"])
+    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    margin = 4
+    draw.ellipse([margin, margin, size - margin, size - margin], fill=color)
+    return img
 
 # --- Запись ---
 
