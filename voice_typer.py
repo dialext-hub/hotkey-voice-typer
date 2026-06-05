@@ -155,6 +155,7 @@ class TrayIcon:
     def __init__(self, notify_enabled=False):
         self._notify_enabled = notify_enabled
         self._error_timer = None
+        self._reload_callback = None
         self._icon = pystray.Icon(
             "hotkey-voice-typer",
             make_icon("idle"),
@@ -165,11 +166,22 @@ class TrayIcon:
                     lambda icon, item: self._open_config(),
                 ),
                 pystray.MenuItem(
+                    "Перечитать конфиг",
+                    lambda icon, item: self._on_reload(),
+                ),
+                pystray.MenuItem(
                     "Выход",
                     lambda icon, item: self._exit(),
                 ),
             ),
         )
+
+    def set_reload_callback(self, callback):
+        self._reload_callback = callback
+
+    def _on_reload(self):
+        if self._reload_callback:
+            self._reload_callback()
 
     def run_detached(self):
         self._icon.run_detached()
