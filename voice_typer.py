@@ -12,7 +12,7 @@ Voice Typer — держи клавишу, говори, отпускай → т
 
 Настройки берутся из config.json (groq_api_key, proxy).
 Зависимости:
-    pip install sounddevice numpy keyboard pyperclip requests scipy pystray Pillow plyer
+    pip install sounddevice numpy keyboard pyperclip requests pystray Pillow plyer
 """
 
 import os
@@ -28,7 +28,6 @@ from pathlib import Path
 try:
     import sounddevice as sd
     import numpy as np
-    import scipy.io.wavfile as wavfile
     import keyboard
     import pyperclip
     import requests
@@ -36,7 +35,7 @@ try:
     from PIL import Image, ImageDraw
 except ImportError as e:
     print(f"Не хватает зависимостей: {e}")
-    print("Установи: pip install sounddevice numpy keyboard pyperclip requests scipy pystray Pillow plyer")
+    print("Установи: pip install sounddevice numpy keyboard pyperclip requests pystray Pillow plyer")
     sys.exit(1)
 
 # --- Конфиг ---
@@ -111,8 +110,13 @@ class AudioRecorder:
     def save_wav(self, path):
         if not self.frames:
             return False
+        import wave
         audio = np.concatenate(self.frames, axis=0)
-        wavfile.write(path, SAMPLE_RATE, audio)
+        with wave.open(path, 'wb') as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)  # int16 = 2 bytes
+            wf.setframerate(SAMPLE_RATE)
+            wf.writeframes(audio.tobytes())
         return True
 
 # --- Автозамены ---

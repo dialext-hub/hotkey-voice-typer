@@ -1,6 +1,5 @@
 sounddevice
 numpy
-scipy
 keyboard
 pyperclip
 requests
