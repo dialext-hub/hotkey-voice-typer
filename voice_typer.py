@@ -155,6 +155,7 @@ class TrayIcon:
     def __init__(self, notify_enabled=False):
         self._notify_enabled = notify_enabled
         self._error_timer = None
+        self._reload_callback = None
         self._icon = pystray.Icon(
             "hotkey-voice-typer",
             make_icon("idle"),
@@ -165,11 +166,22 @@ class TrayIcon:
                     lambda icon, item: self._open_config(),
                 ),
                 pystray.MenuItem(
+                    "Перечитать конфиг",
+                    lambda icon, item: self._on_reload(),
+                ),
+                pystray.MenuItem(
                     "Выход",
                     lambda icon, item: self._exit(),
                 ),
             ),
         )
+
+    def set_reload_callback(self, callback):
+        self._reload_callback = callback
+
+    def _on_reload(self):
+        if self._reload_callback:
+            self._reload_callback()
 
     def run_detached(self):
         self._icon.run_detached()
@@ -243,12 +255,13 @@ def paste_text(text, auto_type=False):
 
 def main():
     parser = argparse.ArgumentParser(description="Voice Typer — говори, получай текст")
-    parser.add_argument("--key", default="f9",
-                        help="Клавиша или комбинация для записи (default: f9). "
-                             "Примеры: f9, ctrl+windows, ctrl+alt+f8")
+    parser.add_argument("--key", default=None,
+                        help="Клавиша или комбинация для записи. "
+                             "Примеры: f9, ctrl+windows, ctrl+alt+f8. "
+                             "Если не указано — берётся из config.json (hotkey), дефолт f9")
     parser.add_argument("--lang", default="ru", help="Язык (default: ru)")
     parser.add_argument("--type", action="store_true", dest="auto_type",
-                        help="Печатать текст вместо вставки из буфера")
+                        help="Печатать текст вместо вставки из буфера (override для paste_mode)")
     parser.add_argument("--notify", action="store_true",
                         help="Показывать toast-уведомление с расшифрованным текстом")
     parser.add_argument("--debug", action="store_true", help="Показывать отладочные сообщения")
@@ -256,33 +269,42 @@ def main():
 
     hide_console()
 
-    config = load_config()
-    api_key = config.get("groq_api_key") or os.environ.get("GROQ_API_KEY")
-    proxy = config.get("proxy") or os.environ.get("HTTPS_PROXY") or os.environ.get("HTTP_PROXY")
+    # CLI overrides: if --key was passed, it always wins over config.
+    # If --type was passed, it always wins over paste_mode in config.
+    _cli_key = args.key       # None = "read from config"
+    _cli_auto_type = args.auto_type  # True = --type was explicitly passed
+
+    def _parse_hotkey(hotkey_str):
+        parts = [k.strip().lower() for k in hotkey_str.split("+")]
+        return parts[-1], set(parts[:-1])  # trigger_key, modifiers
+
+    initial_config = load_config()
+    initial_hotkey = _cli_key if _cli_key is not None else initial_config.get("hotkey", "f9")
+    trigger_key, modifiers = _parse_hotkey(initial_hotkey)
+
+    # cfg holds only what affects the keyboard hook (needs re-hook on change)
+    cfg = {
+        "trigger_key": trigger_key,
+        "modifiers":   modifiers,
+    }
 
     tray = TrayIcon(notify_enabled=args.notify)
     tray.run_detached()
 
-    if not api_key or api_key == "gsk_your_key_here":
+    initial_api_key = initial_config.get("groq_api_key") or os.environ.get("GROQ_API_KEY")
+    if not initial_api_key or initial_api_key == "gsk_your_key_here":
         tray._icon.title = "Voice Typer — нет API ключа (меню → Открыть config.json)"
         tray.notify(
             "Voice Typer — нет API ключа",
             "Открой config.json через меню трея и добавь groq_api_key",
             force=True,
         )
-        while True:
-            time.sleep(3600)
-
-    # Разбираем комбинацию: "ctrl+windows" → modifiers={"ctrl"}, trigger="windows"
-    key_parts = [k.strip().lower() for k in args.key.split("+")]
-    trigger_key = key_parts[-1]
-    modifiers = set(key_parts[:-1])
 
     recorder = AudioRecorder()
     is_recording = threading.Event()
 
     if args.debug:
-        print(f"[debug] Voice Typer ready. Key: {args.key.upper()}")
+        print(f"[debug] Voice Typer ready. Key: {initial_hotkey.upper()}")
 
     def process_audio():
         if not _processing_lock.acquire(blocking=False):
@@ -291,17 +313,35 @@ def main():
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
             tmp_path = tmp.name
         try:
+            fresh = load_config()
+
+            current_api_key = fresh.get("groq_api_key") or os.environ.get("GROQ_API_KEY")
+            if current_api_key == "gsk_your_key_here":
+                current_api_key = None
+
+            if not current_api_key:
+                tray.set_state("error")
+                tray.notify(
+                    "Voice Typer — нет API ключа",
+                    "Открой config.json через меню трея и добавь groq_api_key",
+                    force=True,
+                )
+                return
+
+            current_proxy = fresh.get("proxy") or os.environ.get("HTTPS_PROXY") or os.environ.get("HTTP_PROXY")
+            current_auto_type = _cli_auto_type or (fresh.get("paste_mode", "clipboard") == "type")
+
             if recorder.save_wav(tmp_path):
-                text = transcribe_groq(tmp_path, api_key, args.lang, proxy)
+                text = transcribe_groq(tmp_path, current_api_key, args.lang, current_proxy)
                 if text:
-                    rules = load_config().get("voice_replacements", [])
+                    rules = fresh.get("voice_replacements", [])
                     if rules:
                         text = apply_replacements(text, rules)
                     tray.set_state("idle")
                     tray.notify("Voice Typer", text)
                     if args.debug:
                         print(f"[debug] {text}")
-                    paste_text(text, args.auto_type)
+                    paste_text(text, current_auto_type)
                 else:
                     tray.set_state("idle")
             else:
@@ -319,12 +359,12 @@ def main():
             _processing_lock.release()
 
     def modifiers_held():
-        return all(keyboard.is_pressed(m) for m in modifiers)
+        return all(keyboard.is_pressed(m) for m in cfg["modifiers"])
 
     def on_key_event(e):
         if args.debug:
             print(f"[debug] {e.event_type}: name={e.name!r} scan_code={e.scan_code}", flush=True)
-        if e.name != trigger_key:
+        if e.name != cfg["trigger_key"]:
             return
         if e.event_type == keyboard.KEY_DOWN and not is_recording.is_set() and modifiers_held():
             is_recording.set()
@@ -335,6 +375,33 @@ def main():
             recorder.stop()
             tray.set_state("processing")
             threading.Thread(target=process_audio, daemon=True).start()
+
+    def reload_config():
+        new_cfg = load_config()
+
+        # Update hotkey (unless CLI --key was explicitly passed)
+        new_hotkey_str = _cli_key if _cli_key is not None else new_cfg.get("hotkey", "f9")
+        new_trigger, new_modifiers = _parse_hotkey(new_hotkey_str)
+        if new_trigger != cfg["trigger_key"] or new_modifiers != cfg["modifiers"]:
+            if is_recording.is_set():
+                is_recording.clear()
+                recorder.stop()
+                tray.set_state("idle")
+            cfg["trigger_key"] = new_trigger
+            cfg["modifiers"] = new_modifiers
+            keyboard.unhook_all()
+            keyboard.hook(on_key_event)
+
+        # Update tray title based on api_key status
+        new_api_key = new_cfg.get("groq_api_key") or os.environ.get("GROQ_API_KEY")
+        if new_api_key and new_api_key != "gsk_your_key_here":
+            tray._icon.title = "hotkey-voice-typer"
+        else:
+            tray._icon.title = "Voice Typer — нет API ключа (меню → Открыть config.json)"
+
+        tray.notify("Voice Typer", "Конфиг обновлён")
+
+    tray.set_reload_callback(reload_config)
 
     keyboard.hook(on_key_event)
 

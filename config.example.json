@@ -1,5 +1,7 @@
 {
   "groq_api_key": "gsk_your_key_here",
+  "hotkey": "f9",
+  "paste_mode": "clipboard",
   "proxy": "",
   "voice_replacements": [
     {"from": "Cloud Code", "to": "Claude Code"},
