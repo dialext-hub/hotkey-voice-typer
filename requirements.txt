@@ -4,3 +4,6 @@ scipy
 keyboard
 pyperclip
 requests
+pystray
+Pillow
+plyer
