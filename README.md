@@ -30,6 +30,18 @@ Hold the hotkey (default: `F9`) → microphone records → release → audio is 
 
 ## Installation / Установка
 
+### Option A: Windows Installer (no Python required)
+
+Download `hotkey-voice-typer-setup.exe` from [Releases](https://github.com/dialext-hub/hotkey-voice-typer/releases) and run it.
+The installer creates a shortcut on your desktop and optionally adds the app to Windows startup.
+`config.json` is created automatically — open it from the tray menu (right-click → Открыть config.json) and add your API key.
+
+Скачай `hotkey-voice-typer-setup.exe` из [Releases](https://github.com/dialext-hub/hotkey-voice-typer/releases) и запусти.
+Установщик создаёт ярлык на рабочем столе и опционально добавляет в автозапуск.
+`config.json` создаётся автоматически — открой его через меню трея (правая кнопка → Открыть config.json) и добавь API ключ.
+
+### Option B: Python (from source)
+
 ```bash
 git clone https://github.com/dialext-hub/hotkey-voice-typer.git
 cd hotkey-voice-typer
@@ -50,6 +62,7 @@ python voice_typer.py --key f8     # use F8 instead
 python voice_typer.py --key ctrl+windows  # modifier combo
 python voice_typer.py --lang en    # English transcription | транскрибация на английском
 python voice_typer.py --type       # type text instead of clipboard | печатать вместо вставки
+python voice_typer.py --notify     # show toast with transcribed text | уведомление с расшифровкой
 ```
 
 ---
@@ -112,6 +125,10 @@ Make sure `config.json` exists in the same directory as `voice_typer.py`.
 **No audio recorded / Нет записи**  
 Check that your default microphone is working and not muted in Windows Sound settings.  
 Проверь, что микрофон по умолчанию работает и не заглушён в настройках звука Windows.
+
+**Tray icon does not appear / Иконка в трее не появляется**  
+Make sure `pystray` and `Pillow` are installed: `pip install pystray Pillow`.  
+Убедись, что установлены `pystray` и `Pillow`: `pip install pystray Pillow`.
 
 ---
 
