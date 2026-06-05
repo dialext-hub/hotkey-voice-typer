@@ -189,6 +189,8 @@ class TrayIcon:
             os.startfile(str(config_path))
 
     def _exit(self):
+        if self._error_timer is not None:
+            self._error_timer.cancel()
         self._icon.stop()
         os._exit(0)
 
@@ -250,8 +252,8 @@ def main():
             "Добавь groq_api_key в config.json (меню трея → Открыть config.json)",
             force=True,
         )
-        threading.Event().wait()
-        return
+        while True:
+            time.sleep(3600)
 
     # Разбираем комбинацию: "ctrl+windows" → modifiers={"ctrl"}, trigger="windows"
     key_parts = [k.strip().lower() for k in args.key.split("+")]
