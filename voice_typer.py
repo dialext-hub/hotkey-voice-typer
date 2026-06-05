@@ -383,6 +383,10 @@ def main():
         new_hotkey_str = _cli_key if _cli_key is not None else new_cfg.get("hotkey", "f9")
         new_trigger, new_modifiers = _parse_hotkey(new_hotkey_str)
         if new_trigger != cfg["trigger_key"] or new_modifiers != cfg["modifiers"]:
+            if is_recording.is_set():
+                is_recording.clear()
+                recorder.stop()
+                tray.set_state("idle")
             cfg["trigger_key"] = new_trigger
             cfg["modifiers"] = new_modifiers
             keyboard.unhook_all()
@@ -395,7 +399,7 @@ def main():
         else:
             tray._icon.title = "Voice Typer — нет API ключа (меню → Открыть config.json)"
 
-        tray.notify("Voice Typer", "Конфиг обновлён", force=True)
+        tray.notify("Voice Typer", "Конфиг обновлён")
 
     tray.set_reload_callback(reload_config)
 
