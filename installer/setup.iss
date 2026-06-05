@@ -3,7 +3,7 @@
 #define MyAppExeName "hotkey-voice-typer.exe"
 
 [Setup]
-AppId={{B7E4F2A1-3C8D-4E5F-9012-ABCDEF345678}
+AppId={{B7E4F2A1-3C8D-4E5F-9012-ABCDEF345678}}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 DefaultDirName={localappdata}\{#MyAppName}
