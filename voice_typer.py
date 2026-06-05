@@ -138,6 +138,56 @@ def apply_replacements(text, rules):
     return text
 
 
+# --- Системный трей (иконка) ---
+
+class TrayIcon:
+    def __init__(self, notify_enabled=False):
+        self._notify_enabled = notify_enabled
+        self._icon = pystray.Icon(
+            "hotkey-voice-typer",
+            make_icon("idle"),
+            "hotkey-voice-typer",
+            menu=pystray.Menu(
+                pystray.MenuItem(
+                    "Открыть config.json",
+                    lambda icon, item: self._open_config(),
+                ),
+                pystray.MenuItem(
+                    "Выход",
+                    lambda icon, item: self._exit(),
+                ),
+            ),
+        )
+
+    def run_detached(self):
+        self._icon.run_detached()
+
+    def set_state(self, state):
+        self._icon.icon = make_icon(state)
+        if state == "error":
+            threading.Timer(2.0, lambda: self.set_state("idle")).start()
+
+    def notify(self, title, message, force=False):
+        if self._notify_enabled or force:
+            try:
+                from plyer import notification
+                notification.notify(title=title, message=message, timeout=4)
+            except Exception:
+                pass
+
+    def stop(self):
+        self._icon.stop()
+
+    def _open_config(self):
+        config_path = Path(__file__).parent / "config.json"
+        if config_path.exists():
+            os.startfile(str(config_path))
+
+    def _exit(self):
+        self._icon.stop()
+        os._exit(0)
+
+
 # --- Groq транскрипция ---
 
 def transcribe_groq(wav_path, api_key, language="ru", proxy=None):
