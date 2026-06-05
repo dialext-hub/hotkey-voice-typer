@@ -74,6 +74,8 @@ Copy `config.example.json` to `config.json` and edit:
 ```json
 {
   "groq_api_key": "gsk_...",
+  "hotkey": "f9",
+  "paste_mode": "clipboard",
   "proxy": "",
   "voice_replacements": []
 }
