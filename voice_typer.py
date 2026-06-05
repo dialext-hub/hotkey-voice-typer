@@ -40,7 +40,13 @@ except ImportError as e:
 
 # --- Конфиг ---
 
-CONFIG_FILE = Path(__file__).parent / "config.json"
+def _app_dir() -> Path:
+    # PyInstaller --onefile extracts to a temp dir; sys.executable points to the real .exe
+    if getattr(sys, 'frozen', False):
+        return Path(sys.executable).parent
+    return Path(__file__).parent
+
+CONFIG_FILE = _app_dir() / "config.json"
 
 def load_config():
     if CONFIG_FILE.exists():
@@ -189,7 +195,7 @@ class TrayIcon:
         self._icon.stop()
 
     def _open_config(self):
-        config_path = Path(__file__).parent / "config.json"
+        config_path = _app_dir() / "config.json"
         if not config_path.exists():
             example = config_path.parent / "config.example.json"
             if example.exists():
@@ -257,10 +263,11 @@ def main():
     tray = TrayIcon(notify_enabled=args.notify)
     tray.run_detached()
 
-    if not api_key:
+    if not api_key or api_key == "gsk_your_key_here":
+        tray._icon.title = "Voice Typer — нет API ключа (меню → Открыть config.json)"
         tray.notify(
-            "Voice Typer",
-            "Добавь groq_api_key в config.json (меню трея → Открыть config.json)",
+            "Voice Typer — нет API ключа",
+            "Открой config.json через меню трея и добавь groq_api_key",
             force=True,
         )
         while True:
