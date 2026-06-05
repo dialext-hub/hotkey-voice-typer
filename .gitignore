@@ -19,3 +19,11 @@ __pycache__/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# PyInstaller build artifacts
+dist/
+build/
+*.spec
+
+# Inno Setup output
+installer/hotkey-voice-typer-setup.exe
