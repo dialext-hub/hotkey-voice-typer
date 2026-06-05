@@ -143,6 +143,7 @@ def apply_replacements(text, rules):
 class TrayIcon:
     def __init__(self, notify_enabled=False):
         self._notify_enabled = notify_enabled
+        self._error_timer = None
         self._icon = pystray.Icon(
             "hotkey-voice-typer",
             make_icon("idle"),
@@ -163,9 +164,13 @@ class TrayIcon:
         self._icon.run_detached()
 
     def set_state(self, state):
+        if self._error_timer is not None:
+            self._error_timer.cancel()
+            self._error_timer = None
         self._icon.icon = make_icon(state)
         if state == "error":
-            threading.Timer(2.0, lambda: self.set_state("idle")).start()
+            self._error_timer = threading.Timer(2.0, lambda: self.set_state("idle"))
+            self._error_timer.start()
 
     def notify(self, title, message, force=False):
         if self._notify_enabled or force:
