@@ -84,6 +84,7 @@ def make_icon(state, size=64):
 
 SAMPLE_RATE = 16000  # Groq хорошо работает с 16kHz
 _processing_lock = threading.Lock()
+_hook_lock = threading.Lock()
 
 class AudioRecorder:
     def __init__(self):
@@ -383,14 +384,15 @@ def main():
         new_hotkey_str = _cli_key if _cli_key is not None else new_cfg.get("hotkey", "f9")
         new_trigger, new_modifiers = _parse_hotkey(new_hotkey_str)
         if new_trigger != cfg["trigger_key"] or new_modifiers != cfg["modifiers"]:
-            if is_recording.is_set():
-                is_recording.clear()
-                recorder.stop()
-                tray.set_state("idle")
-            cfg["trigger_key"] = new_trigger
-            cfg["modifiers"] = new_modifiers
-            keyboard.unhook_all()
-            keyboard.hook(on_key_event)
+            with _hook_lock:
+                if is_recording.is_set():
+                    is_recording.clear()
+                    recorder.stop()
+                    tray.set_state("idle")
+                cfg["trigger_key"] = new_trigger
+                cfg["modifiers"] = new_modifiers
+                keyboard.unhook_all()
+                keyboard.hook(on_key_event)
 
         # Update tray title based on api_key status
         new_api_key = new_cfg.get("groq_api_key") or os.environ.get("GROQ_API_KEY")
