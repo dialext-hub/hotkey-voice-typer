@@ -79,11 +79,13 @@ Copy `config.example.json` to `config.json` and edit:
 }
 ```
 
-| Field | Description |
-|---|---|
-| `groq_api_key` | Your Groq API key |
-| `proxy` | HTTP proxy URL, e.g. `http://127.0.0.1:2080` (optional) |
-| `voice_replacements` | Auto-replacement rules, see below |
+| Field | Default | Description |
+|---|---|---|
+| `groq_api_key` | required | Your Groq API key |
+| `hotkey` | `f9` | Recording hotkey — single key or combo (e.g. `ctrl+windows`, `f8`) |
+| `paste_mode` | `clipboard` | How to insert text: `clipboard` (Ctrl+V) or `type` (keyboard emulation) |
+| `proxy` | `""` | HTTP proxy URL, e.g. `http://127.0.0.1:2080` (optional) |
+| `voice_replacements` | `[]` | Auto-replacement rules, see below |
 
 ---
 
