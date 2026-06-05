@@ -230,16 +230,28 @@ def main():
     parser.add_argument("--lang", default="ru", help="Язык (default: ru)")
     parser.add_argument("--type", action="store_true", dest="auto_type",
                         help="Печатать текст вместо вставки из буфера")
-    parser.add_argument("--debug", action="store_true", help="Показывать все события клавиш")
+    parser.add_argument("--notify", action="store_true",
+                        help="Показывать toast-уведомление с расшифрованным текстом")
+    parser.add_argument("--debug", action="store_true", help="Показывать отладочные сообщения")
     args = parser.parse_args()
+
+    hide_console()
 
     config = load_config()
     api_key = config.get("groq_api_key") or os.environ.get("GROQ_API_KEY")
     proxy = config.get("proxy") or os.environ.get("HTTPS_PROXY") or os.environ.get("HTTP_PROXY")
 
+    tray = TrayIcon(notify_enabled=args.notify)
+    tray.run_detached()
+
     if not api_key:
-        print("❌ Groq API key не найден. Укажи groq_api_key в config.json или переменной GROQ_API_KEY")
-        sys.exit(1)
+        tray.notify(
+            "Voice Typer",
+            "Добавь groq_api_key в config.json (меню трея → Открыть config.json)",
+            force=True,
+        )
+        threading.Event().wait()
+        return
 
     # Разбираем комбинацию: "ctrl+windows" → modifiers={"ctrl"}, trigger="windows"
     key_parts = [k.strip().lower() for k in args.key.split("+")]
@@ -249,9 +261,8 @@ def main():
     recorder = AudioRecorder()
     is_recording = threading.Event()
 
-    print(f"🎤 Voice Typer готов. Держи [{args.key.upper()}] чтобы говорить. Ctrl+C для выхода.")
-    if proxy:
-        print(f"   Прокси: {proxy}")
+    if args.debug:
+        print(f"[debug] Voice Typer ready. Key: {args.key.upper()}")
 
     def process_audio():
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
@@ -263,14 +274,20 @@ def main():
                     rules = load_config().get("voice_replacements", [])
                     if rules:
                         text = apply_replacements(text, rules)
-                    print(f" ✅\n📝 {text}\n")
+                    tray.set_state("idle")
+                    tray.notify("Voice Typer", text)
+                    if args.debug:
+                        print(f"[debug] {text}")
                     paste_text(text, args.auto_type)
                 else:
-                    print(" (пусто)\n")
+                    tray.set_state("idle")
             else:
-                print(" (нет аудио)\n")
+                tray.set_state("idle")
         except Exception as ex:
-            print(f" ❌ Ошибка: {ex}\n")
+            tray.set_state("error")
+            tray.notify("Voice Typer — Ошибка", str(ex), force=True)
+            if args.debug:
+                print(f"[debug] error: {ex}")
         finally:
             try:
                 os.unlink(tmp_path)
@@ -288,11 +305,11 @@ def main():
         if e.event_type == keyboard.KEY_DOWN and not is_recording.is_set() and modifiers_held():
             is_recording.set()
             recorder.start()
-            print("🔴 Запись...", end="", flush=True)
+            tray.set_state("recording")
         elif e.event_type == keyboard.KEY_UP and is_recording.is_set():
             is_recording.clear()
             recorder.stop()
-            print(" стоп. Расшифровываю...", end="", flush=True)
+            tray.set_state("processing")
             threading.Thread(target=process_audio, daemon=True).start()
 
     keyboard.hook(on_key_event)
@@ -300,7 +317,7 @@ def main():
     try:
         keyboard.wait()
     except KeyboardInterrupt:
-        print("\nВыход.")
+        tray.stop()
 
 if __name__ == "__main__":
     main()
