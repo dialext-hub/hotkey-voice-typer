@@ -78,6 +78,7 @@ def make_icon(state, size=64):
 # --- Запись ---
 
 SAMPLE_RATE = 16000  # Groq хорошо работает с 16kHz
+_processing_lock = threading.Lock()
 
 class AudioRecorder:
     def __init__(self):
@@ -185,8 +186,14 @@ class TrayIcon:
 
     def _open_config(self):
         config_path = Path(__file__).parent / "config.json"
-        if config_path.exists():
-            os.startfile(str(config_path))
+        if not config_path.exists():
+            example = config_path.parent / "config.example.json"
+            if example.exists():
+                import shutil
+                shutil.copy(example, config_path)
+            else:
+                config_path.write_text('{"groq_api_key": ""}', encoding="utf-8")
+        os.startfile(str(config_path))
 
     def _exit(self):
         if self._error_timer is not None:
@@ -267,6 +274,9 @@ def main():
         print(f"[debug] Voice Typer ready. Key: {args.key.upper()}")
 
     def process_audio():
+        if not _processing_lock.acquire(blocking=False):
+            tray.set_state("idle")
+            return
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
             tmp_path = tmp.name
         try:
@@ -295,6 +305,7 @@ def main():
                 os.unlink(tmp_path)
             except Exception:
                 pass
+            _processing_lock.release()
 
     def modifiers_held():
         return all(keyboard.is_pressed(m) for m in modifiers)
