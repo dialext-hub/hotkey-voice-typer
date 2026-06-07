@@ -1,5 +1,5 @@
 # build.ps1 — builds hotkey-voice-typer-setup.exe
-# Prerequisites: pip install pyinstaller; Inno Setup with iscc in PATH
+# Prerequisites: pip install pyinstaller; Inno Setup installed via winget (iscc NOT in PATH by default)
 # Run from: C:\Projects\hotkey-voice-typer\
 
 Write-Host "=== hotkey-voice-typer build ===" -ForegroundColor Cyan
@@ -13,7 +13,7 @@ if (-not (Test-Path $exe)) { Write-Error "exe not found: $exe"; exit 1 }
 Write-Host "  OK: $exe" -ForegroundColor Green
 
 Write-Host "Step 2: Inno Setup..."
-iscc "installer\setup.iss"
+& "$env:LOCALAPPDATA\Programs\Inno Setup 6\iscc.exe" "installer\setup.iss"
 if ($LASTEXITCODE -ne 0) { Write-Error "Inno Setup failed"; exit 1 }
 
 $installer = "installer\hotkey-voice-typer-setup.exe"
