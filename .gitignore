@@ -27,3 +27,8 @@ build/
 
 # Inno Setup output
 installer/hotkey-voice-typer-setup.exe
+
+# Icon generation artifacts
+icon_v*.png
+icon_compare*.png
+make_icon.py

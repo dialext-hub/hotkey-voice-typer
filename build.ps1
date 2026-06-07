@@ -5,7 +5,7 @@
 Write-Host "=== hotkey-voice-typer build ===" -ForegroundColor Cyan
 
 Write-Host "Step 1: PyInstaller..."
-python -m PyInstaller voice_typer.py --onefile --noconsole --name hotkey-voice-typer --clean
+python -m PyInstaller voice_typer.py --onefile --noconsole --name hotkey-voice-typer --icon icon.ico --clean
 if ($LASTEXITCODE -ne 0) { Write-Error "PyInstaller failed"; exit 1 }
 
 $exe = "dist\hotkey-voice-typer.exe"
