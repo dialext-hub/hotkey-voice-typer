@@ -1,12 +1,13 @@
-#define MyAppName "hotkey-voice-typer"
-#define MyAppVersion "1.0.0"
+#define MyAppName "Voice Typer"
+#define MyAppVersion "1.0.6"
 #define MyAppExeName "hotkey-voice-typer.exe"
+#define MyAppInstallDir "hotkey-voice-typer"
 
 [Setup]
 AppId={{B7E4F2A1-3C8D-4E5F-9012-ABCDEF345678}}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
-DefaultDirName={localappdata}\{#MyAppName}
+DefaultDirName={localappdata}\{#MyAppInstallDir}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 OutputDir={#SourcePath}
