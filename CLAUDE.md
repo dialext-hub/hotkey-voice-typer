@@ -28,9 +28,22 @@ Single-file Python script (`voice_typer.py`) + Windows installer.
   "hotkey": "f9",
   "paste_mode": "clipboard",
   "proxy": "",
+  "streaming": false,
+  "pause_threshold": 0.8,
+  "max_chunk_seconds": 15,
+  "silence_threshold": 0.01,
   "voice_replacements": []
 }
 ```
+
+**Streaming mode** (`streaming: true`): detects pauses while the hotkey is held
+and transcribes/pastes the audio in chunks as you speak, instead of only after
+release. `pause_threshold` = seconds of silence that ends a chunk;
+`max_chunk_seconds` = forced flush during long pause-free speech;
+`silence_threshold` = normalized RMS (0..1) below which audio counts as silence.
+Streaming flags are read fresh at key-down; per-chunk values (`paste_mode`,
+`voice_replacements`, etc.) are read fresh per chunk. Trade-off: slightly lower
+accuracy on short chunks and more API requests — hence opt-in.
 
 All fields are hot-reloaded on every transcription — no restart needed. Hotkey changes require clicking "Перечитать конфиг" in the tray menu (triggers keyboard re-hook).
 
