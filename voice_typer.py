@@ -21,6 +21,7 @@ import sys
 import json
 import time
 import tempfile
+import queue
 import threading
 import argparse
 from pathlib import Path
@@ -182,6 +183,38 @@ class ChunkDetector:
             return self._emit()
         self._reset()
         return None
+
+
+class ChunkTranscriber:
+    """Один фоновый поток + FIFO-очередь. Чанки обрабатываются строго по
+    порядку, даже если расшифровка по сети возвращается вразнобой."""
+
+    def __init__(self, handle_chunk):
+        self._handle = handle_chunk
+        self._queue = queue.Queue()
+        self._thread = None
+
+    def start(self):
+        if self._thread is not None:
+            return
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    def submit(self, chunk, is_first):
+        self._queue.put((chunk, is_first))
+
+    def wait_idle(self):
+        self._queue.join()
+
+    def _run(self):
+        while True:
+            chunk, is_first = self._queue.get()
+            try:
+                self._handle(chunk, is_first)
+            except Exception:
+                pass
+            finally:
+                self._queue.task_done()
 
 
 # --- Автозамены ---
