@@ -126,6 +126,64 @@ class AudioRecorder:
             wf.writeframes(audio.tobytes())
         return True
 
+# --- Детекция пауз (VAD) ---
+
+def rms_normalized(block):
+    """RMS-громкость int16-блока, нормализованная в 0..1 (32768 = максимум)."""
+    if block.size == 0:
+        return 0.0
+    x = block.astype(np.float64)
+    return float(np.sqrt(np.mean(x * x))) / 32768.0
+
+
+class ChunkDetector:
+    """Накапливает аудио-блоки и отдаёт готовый чанк на границе паузы или
+    по достижении максимальной длины. Чистая логика, без звука и сети."""
+
+    def __init__(self, sample_rate, pause_threshold, max_chunk_seconds,
+                 silence_threshold, min_voice_seconds=0.3):
+        self._sample_rate = sample_rate
+        self._pause_threshold = pause_threshold
+        self._max_chunk_seconds = max_chunk_seconds
+        self._silence_threshold = silence_threshold
+        self._min_voice_seconds = min_voice_seconds
+        self._reset()
+
+    def _reset(self):
+        self._frames = []
+        self._silence_run = 0.0
+        self._voice_seconds = 0.0
+
+    def _emit(self):
+        chunk = np.concatenate(self._frames, axis=0)
+        self._reset()
+        return chunk
+
+    def feed(self, block):
+        block_seconds = len(block) / self._sample_rate
+        self._frames.append(block)
+        if rms_normalized(block) >= self._silence_threshold:
+            self._voice_seconds += block_seconds
+            self._silence_run = 0.0
+        else:
+            self._silence_run += block_seconds
+
+        if self._voice_seconds < self._min_voice_seconds:
+            return None
+        total = sum(len(f) for f in self._frames) / self._sample_rate
+        if self._silence_run >= self._pause_threshold:
+            return self._emit()
+        if total >= self._max_chunk_seconds:
+            return self._emit()
+        return None
+
+    def flush(self):
+        if self._voice_seconds >= self._min_voice_seconds:
+            return self._emit()
+        self._reset()
+        return None
+
+
 # --- Автозамены ---
 
 def apply_replacements(text, rules):
