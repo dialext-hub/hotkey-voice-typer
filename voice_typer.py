@@ -87,15 +87,30 @@ SAMPLE_RATE = 16000  # Groq хорошо работает с 16kHz
 _processing_lock = threading.Lock()
 _hook_lock = threading.Lock()
 
+def write_wav(path, audio):
+    import wave
+    with wave.open(path, 'wb') as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)  # int16 = 2 bytes
+        wf.setframerate(SAMPLE_RATE)
+        wf.writeframes(audio.tobytes())
+
 class AudioRecorder:
     def __init__(self):
         self.frames = []
         self.recording = False
+        self.streaming = False
         self._stream = None
+        self._detector = None
+        self._on_chunk = None
+        self._chunk_index = 0
 
     def start(self):
         self.frames = []
         self.recording = True
+        self.streaming = False
+        self._detector = None
+        self._on_chunk = None
         self._stream = sd.InputStream(
             samplerate=SAMPLE_RATE,
             channels=1,
@@ -104,8 +119,34 @@ class AudioRecorder:
         )
         self._stream.start()
 
+    def start_streaming(self, detector, on_chunk):
+        self.frames = []
+        self.recording = True
+        self.streaming = True
+        self._detector = detector
+        self._on_chunk = on_chunk
+        self._chunk_index = 0
+        self._stream = sd.InputStream(
+            samplerate=SAMPLE_RATE,
+            channels=1,
+            dtype="int16",
+            callback=self._callback,
+        )
+        self._stream.start()
+
+    def _emit_chunk(self, chunk):
+        is_first = (self._chunk_index == 0)
+        self._chunk_index += 1
+        self._on_chunk(chunk, is_first)
+
     def _callback(self, indata, frames, time_info, status):
-        if self.recording:
+        if not self.recording:
+            return
+        if self._detector is not None:
+            chunk = self._detector.feed(indata.copy())
+            if chunk is not None:
+                self._emit_chunk(chunk)
+        else:
             self.frames.append(indata.copy())
 
     def stop(self):
@@ -115,16 +156,18 @@ class AudioRecorder:
             self._stream.close()
             self._stream = None
 
+    def flush_final(self):
+        if self._detector is None:
+            return
+        chunk = self._detector.flush()
+        if chunk is not None:
+            self._emit_chunk(chunk)
+
     def save_wav(self, path):
         if not self.frames:
             return False
-        import wave
         audio = np.concatenate(self.frames, axis=0)
-        with wave.open(path, 'wb') as wf:
-            wf.setnchannels(1)
-            wf.setsampwidth(2)  # int16 = 2 bytes
-            wf.setframerate(SAMPLE_RATE)
-            wf.writeframes(audio.tobytes())
+        write_wav(path, audio)
         return True
 
 # --- Детекция пауз (VAD) ---
@@ -395,6 +438,49 @@ def main():
     recorder = AudioRecorder()
     is_recording = threading.Event()
 
+    def handle_chunk(chunk, is_first):
+        fresh = load_config()
+        current_api_key = fresh.get("groq_api_key") or os.environ.get("GROQ_API_KEY")
+        if current_api_key == "gsk_your_key_here":
+            current_api_key = None
+        if not current_api_key:
+            tray.set_state("error")
+            tray.notify(
+                "Voice Typer — нет API ключа",
+                "Открой config.json через меню трея и добавь groq_api_key",
+                force=True,
+            )
+            return
+        current_proxy = fresh.get("proxy") or os.environ.get("HTTPS_PROXY") or os.environ.get("HTTP_PROXY")
+        current_auto_type = _cli_auto_type or (fresh.get("paste_mode", "clipboard") == "type")
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+            tmp_path = tmp.name
+        try:
+            write_wav(tmp_path, chunk)
+            text = transcribe_groq(tmp_path, current_api_key, args.lang, current_proxy)
+            if text:
+                rules = fresh.get("voice_replacements", [])
+                if rules:
+                    text = apply_replacements(text, rules)
+                if not is_first:
+                    text = " " + text
+                if args.debug:
+                    print(f"[debug] chunk: {text}")
+                paste_text(text, current_auto_type)
+        except Exception as ex:
+            tray.set_state("error")
+            tray.notify("Voice Typer — Ошибка", str(ex), force=True)
+            if args.debug:
+                print(f"[debug] chunk error: {ex}")
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
+
+    transcriber = ChunkTranscriber(handle_chunk)
+    transcriber.start()
+
     if args.debug:
         print(f"[debug] Voice Typer ready. Key: {initial_hotkey.upper()}")
 
@@ -460,13 +546,34 @@ def main():
             return
         if e.event_type == keyboard.KEY_DOWN and not is_recording.is_set() and modifiers_held():
             is_recording.set()
-            recorder.start()
+            fresh = load_config()
+            if fresh.get("streaming", False):
+                detector = ChunkDetector(
+                    SAMPLE_RATE,
+                    float(fresh.get("pause_threshold", 0.8)),
+                    float(fresh.get("max_chunk_seconds", 15)),
+                    float(fresh.get("silence_threshold", 0.01)),
+                )
+                recorder.start_streaming(detector, transcriber.submit)
+            else:
+                recorder.start()
             tray.set_state("recording")
         elif e.event_type == keyboard.KEY_UP and is_recording.is_set():
             is_recording.clear()
-            recorder.stop()
-            tray.set_state("processing")
-            threading.Thread(target=process_audio, daemon=True).start()
+            if recorder.streaming:
+                recorder.stop()
+                recorder.flush_final()
+                tray.set_state("processing")
+
+                def _drain():
+                    transcriber.wait_idle()
+                    tray.set_state("idle")
+
+                threading.Thread(target=_drain, daemon=True).start()
+            else:
+                recorder.stop()
+                tray.set_state("processing")
+                threading.Thread(target=process_audio, daemon=True).start()
 
     def reload_config():
         new_cfg = load_config()
