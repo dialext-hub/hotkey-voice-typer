@@ -444,7 +444,6 @@ def main():
         if current_api_key == "gsk_your_key_here":
             current_api_key = None
         if not current_api_key:
-            tray.set_state("error")
             tray.notify(
                 "Voice Typer — нет API ключа",
                 "Открой config.json через меню трея и добавь groq_api_key",
@@ -468,7 +467,6 @@ def main():
                     print(f"[debug] chunk: {text}")
                 paste_text(text, current_auto_type)
         except Exception as ex:
-            tray.set_state("error")
             tray.notify("Voice Typer — Ошибка", str(ex), force=True)
             if args.debug:
                 print(f"[debug] chunk error: {ex}")
@@ -567,7 +565,8 @@ def main():
 
                 def _drain():
                     transcriber.wait_idle()
-                    tray.set_state("idle")
+                    if not is_recording.is_set():
+                        tray.set_state("idle")
 
                 threading.Thread(target=_drain, daemon=True).start()
             else:
