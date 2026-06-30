@@ -388,6 +388,46 @@ def paste_text(text, auto_type=False):
 
 # --- Основной цикл ---
 
+def decide_key_action(event_type, key_name, modifiers_ok, state):
+    """Pure decision for a key event. No side effects, no keyboard/audio access.
+
+    event_type: "down" or "up" (== keyboard.KEY_DOWN / keyboard.KEY_UP)
+    key_name:   the event's key name (e.name)
+    modifiers_ok: required modifiers for the matched key are currently held
+    state: dict with ptt_key, stream_key (str|None), ptt_recording,
+           stream_active, stream_key_held (bools)
+    Returns one of: "start_ptt", "stop_ptt", "start_stream", "stop_stream", "ignore".
+    """
+    stream_key = state["stream_key"]
+    if stream_key is not None and key_name == stream_key:
+        if event_type == "down":
+            if state["stream_key_held"]:
+                return "ignore"          # autorepeat while physically held
+            if state["stream_active"]:
+                return "stop_stream"     # toggle off
+            if state["ptt_recording"]:
+                return "ignore"          # mutual exclusion
+            if not modifiers_ok:
+                return "ignore"
+            return "start_stream"        # toggle on
+        return "ignore"                  # up — caller clears stream_key_held
+
+    if key_name == state["ptt_key"]:
+        if event_type == "down":
+            if state["ptt_recording"]:
+                return "ignore"          # autorepeat
+            if state["stream_active"]:
+                return "ignore"          # mutual exclusion
+            if not modifiers_ok:
+                return "ignore"
+            return "start_ptt"
+        if state["ptt_recording"]:
+            return "stop_ptt"
+        return "ignore"
+
+    return "ignore"
+
+
 def main():
     parser = argparse.ArgumentParser(description="Voice Typer — говори, получай текст")
     parser.add_argument("--key", default=None,
