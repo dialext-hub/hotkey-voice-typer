@@ -3,8 +3,8 @@
   "hotkey": "f9",
   "paste_mode": "type",
   "proxy": "",
-  "streaming": false,
-  "pause_threshold": 0.8,
+  "streaming_hotkey": "",
+  "pause_threshold": 1.0,
   "max_chunk_seconds": 15,
   "silence_threshold": 0.01,
   "voice_replacements": [

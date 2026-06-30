@@ -77,8 +77,8 @@ Copy `config.example.json` to `config.json` and edit:
   "hotkey": "f9",
   "paste_mode": "clipboard",
   "proxy": "",
-  "streaming": false,
-  "pause_threshold": 0.8,
+  "streaming_hotkey": "",
+  "pause_threshold": 1.0,
   "max_chunk_seconds": 15,
   "silence_threshold": 0.01,
   "voice_replacements": []
@@ -91,8 +91,8 @@ Copy `config.example.json` to `config.json` and edit:
 | `hotkey` | `f9` | Recording hotkey — single key or combo (e.g. `ctrl+windows`, `f8`) |
 | `paste_mode` | `clipboard` | How to insert text: `clipboard` (Ctrl+V) or `type` (keyboard emulation) |
 | `proxy` | `""` | HTTP proxy URL, e.g. `http://127.0.0.1:2080` (optional) |
-| `streaming` | `false` | Transcribe/paste in chunks while hotkey is held (opt-in; slightly lower accuracy) |
-| `pause_threshold` | `0.8` | Seconds of silence that ends a chunk (streaming mode only) |
+| `streaming_hotkey` | `""` | Toggle hotkey for streaming mode (e.g. `f10`, `ctrl+f10`); tap to start/stop; empty = disabled |
+| `pause_threshold` | `1.0` | Seconds of silence that ends a chunk (streaming mode only) |
 | `max_chunk_seconds` | `15` | Forced chunk flush after this many seconds of continuous speech (streaming mode only) |
 | `silence_threshold` | `0.01` | Normalized RMS (0..1) below which audio counts as silence (streaming mode only) |
 | `voice_replacements` | `[]` | Auto-replacement rules, see below |
