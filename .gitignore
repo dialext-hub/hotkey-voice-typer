@@ -31,4 +31,5 @@ installer/hotkey-voice-typer-setup.exe
 # Icon generation artifacts
 icon_v*.png
 icon_compare*.png
+icon_source.png
 make_icon.py
