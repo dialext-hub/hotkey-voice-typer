@@ -1,8 +1,12 @@
 {
   "groq_api_key": "gsk_your_key_here",
   "hotkey": "f9",
-  "paste_mode": "clipboard",
+  "paste_mode": "type",
   "proxy": "",
+  "streaming_hotkey": "",
+  "pause_threshold": 1.0,
+  "max_chunk_seconds": 15,
+  "silence_threshold": 0.01,
   "voice_replacements": [
     {"from": "Cloud Code", "to": "Claude Code"},
     {"from": "Codorg[ao]s", "to": "CodOrgOS", "regex": true}
