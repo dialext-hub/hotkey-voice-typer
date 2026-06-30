@@ -99,7 +99,6 @@ class AudioRecorder:
     def __init__(self):
         self.frames = []
         self.recording = False
-        self.streaming = False
         self._stream = None
         self._detector = None
         self._on_chunk = None
@@ -108,7 +107,6 @@ class AudioRecorder:
     def start(self):
         self.frames = []
         self.recording = True
-        self.streaming = False
         self._detector = None
         self._on_chunk = None
         self._stream = sd.InputStream(
@@ -122,7 +120,6 @@ class AudioRecorder:
     def start_streaming(self, detector, on_chunk):
         self.frames = []
         self.recording = True
-        self.streaming = True
         self._detector = detector
         self._on_chunk = on_chunk
         self._chunk_index = 0
@@ -390,6 +387,22 @@ def paste_text(text, auto_type=False):
 
 # --- Основной цикл ---
 
+def _parse_hotkey(hotkey_str):
+    parts = [k.strip().lower() for k in hotkey_str.split("+")]
+    return parts[-1], set(parts[:-1])  # trigger_key, modifiers
+
+
+def _parse_stream_hotkey(hotkey_str, main_trigger, main_modifiers):
+    # Presence + non-empty enables streaming; sharing the main BASE key disables it (no-hijack).
+    s = (hotkey_str or "").strip()
+    if not s:
+        return None, set()
+    trig, mods = _parse_hotkey(s)
+    if trig == main_trigger:
+        return None, set()
+    return trig, mods
+
+
 def decide_key_action(event_type, key_name, modifiers_ok, state):
     """Pure decision for a key event. No side effects, no keyboard/audio access.
 
@@ -450,20 +463,6 @@ def main():
     # If --type was passed, it always wins over paste_mode in config.
     _cli_key = args.key       # None = "read from config"
     _cli_auto_type = args.auto_type  # True = --type was explicitly passed
-
-    def _parse_hotkey(hotkey_str):
-        parts = [k.strip().lower() for k in hotkey_str.split("+")]
-        return parts[-1], set(parts[:-1])  # trigger_key, modifiers
-
-    def _parse_stream_hotkey(hotkey_str, main_trigger, main_modifiers):
-        # Presence + non-empty enables streaming; sharing the main hotkey disables it.
-        s = (hotkey_str or "").strip()
-        if not s:
-            return None, set()
-        trig, mods = _parse_hotkey(s)
-        if trig == main_trigger and mods == main_modifiers:
-            return None, set()
-        return trig, mods
 
     initial_config = load_config()
     initial_hotkey = _cli_key if _cli_key is not None else initial_config.get("hotkey", "f9")
@@ -616,13 +615,13 @@ def main():
         tray.set_state("recording")
 
     def _stop_stream():
-        stream_active.clear()
         recorder.stop()
         recorder.flush_final()
         tray.set_state("processing")
 
         def _drain():
             transcriber.wait_idle()
+            stream_active.clear()
             if not is_recording.is_set() and not stream_active.is_set():
                 tray.set_state("idle")
 
